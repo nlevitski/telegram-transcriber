@@ -25,4 +25,4 @@ jobs:
             cd /var/www/telegram-transcriber
             git pull origin main
             bun install
-            pm2 restart telegram-transcriber || pm2 start index.ts --name telegram-transcriber --interpreter bun
+            /root/.local/share/pnpm/pm2 restart telegram-transcriber || /root/.local/share/pnpm/pm2 start index.ts --name telegram-transcriber --interpreter bun
