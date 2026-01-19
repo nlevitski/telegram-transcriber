@@ -23,5 +23,5 @@ jobs:
           script: |
             cd /var/www/telegram-transcriber
             git pull origin main
-            bun install
-            pm2 restart telegram-transcriber || pm2 start bun --name telegram-transcriber -- start
+            /root/.bun/bin/bun install
+            /root/.local/share/pnpm/pm2 restart telegram-transcriber || /root/.local/share/pnpm/pm2 start bun --name telegram-transcriber -- start
