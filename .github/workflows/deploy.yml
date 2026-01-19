@@ -21,8 +21,7 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           # Тут ваши команды, которые должны выполниться на сервере
           script: |
-            export NODE_PATH="/root/.nvm/versions/node/v22.14.0/bin"
-            export BUN_PATH="$HOME/.bun/bin"
+            export PATH="/root/.nvm/versions/node/v22.14.0/bin:$HOME/.bun/bin:$PATH"
             cd /var/www/telegram-transcriber
             git pull origin main
             bun install
