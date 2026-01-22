@@ -21,8 +21,6 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           # Тут ваши команды, которые должны выполниться на сервере
           script: |
-            export PATH="/root/.nvm/versions/node/v22.14.0/bin:$HOME/.bun/bin:$PATH"
             cd /var/www/telegram-transcriber
             git pull origin main
-            bun install
-            /root/.local/share/pnpm/pm2 restart telegram-transcriber || /root/.local/share/pnpm/pm2 start index.ts --name telegram-transcriber --interpreter bun
+            docker compose up -d --build
