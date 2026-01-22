@@ -22,5 +22,6 @@ jobs:
           # Тут ваши команды, которые должны выполниться на сервере
           script: |
             cd /var/www/telegram-transcriber
-            git pull origin main
+            git fetch origin main
+            git reset --hard origin/main
             docker compose up -d --build
