@@ -1,0 +1,15 @@
+node_modules
+.git
+.github
+.vscode
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+Dockerfile
+.dockerignore
+README.md
+CLAUDE.md
+tests
+dist

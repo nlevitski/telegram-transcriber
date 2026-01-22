@@ -1,19 +1,15 @@
-import { ElevenLabsClient, ElevenLabs } from "elevenlabs";
-// import { Readable } from "stream"; // Not needed if using File/Blob
+import { ElevenLabsClient } from "elevenlabs";
 
-// Initialize the client
 const client = new ElevenLabsClient({
-    apiKey: process.env.ELEVENLABS_API_KEY
+    apiKey: Bun.env.ELEVENLABS_API_KEY
 });
 
-export async function transcribeAudioStream(audioBuffer: Buffer): Promise<string> {
+export async function transcribeAudioStream(audioBuffer: Buffer, extension: string = "ogg"): Promise<string> {
     try {
         console.log(`Sending ${audioBuffer.length} bytes to ElevenLabs Scribe v2...`);
 
-        // The SDK expects File | fs.ReadStream | Blob.
-        // Raw streams often lack filename metadata, causing "file unknown is corrupted".
-        // Using Bun's global File object to provide name and type.
-        const audioFile = new File([audioBuffer], "voice.ogg", { type: "audio/ogg" });
+        const mimeType = extension === "mp4" ? "video/mp4" : `audio/${extension}`;
+        const audioFile = new File([audioBuffer], `file.${extension}`, { type: mimeType });
 
         const response = await client.speechToText.convert({
             file: audioFile,
@@ -21,15 +17,7 @@ export async function transcribeAudioStream(audioBuffer: Buffer): Promise<string
         });
 
         console.log("Transcription response received.");
-        // The response body is the text?
-        // Let's check the return type. It usually returns the text directly or a JSON.
-        // The previous file view of `Client.js` line 120: `return _response.body;`
-        // And `BodySpeechToTextV1SpeechToTextPost` didn't show response type.
-        // It's likely the text string or a JSON with text.
-        // Scribe v1 returns text. Scribe v2 likely the same.
-        // In the absence of strong typing, I'll log and return string.
 
-        // If response is an object, try to extract text.
         if (typeof response === 'object' && response !== null && 'text' in response) {
             return (response as any).text;
         }

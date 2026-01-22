@@ -1,0 +1,17 @@
+services:
+  transcriber-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: transcriber-bot:latest
+    container_name: transcriber-bot
+    restart: unless-stopped
+    env_file:
+      - .env
+      - .env.production
+    networks:
+      - underwood-net
+
+networks:
+  underwood-net:
+    external: true
