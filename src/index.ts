@@ -89,24 +89,24 @@ function getReplyMediaFileId(ctx: any): string | null {
     const repliedMessage = ctx.message?.reply_to_message;
     const externalReply = ctx.message?.external_reply;
 
-    const mediaFromReply = repliedMessage?.voice || repliedMessage?.audio || repliedMessage?.video_note || repliedMessage?.video;
+    const mediaFromReply = repliedMessage?.voice || repliedMessage?.audio || repliedMessage?.video_note;
     if (mediaFromReply?.file_id) return mediaFromReply.file_id;
 
     // Bot API may return replied content under external_reply in some contexts.
-    const mediaFromExternalReply = externalReply?.voice || externalReply?.audio || externalReply?.video_note || externalReply?.video;
+    const mediaFromExternalReply = externalReply?.voice || externalReply?.audio || externalReply?.video_note;
     if (mediaFromExternalReply?.file_id) return mediaFromExternalReply.file_id;
 
     // Some clients send audio as generic documents.
     const docMime = repliedMessage?.document?.mime_type || externalReply?.document?.mime_type;
     const doc = repliedMessage?.document || externalReply?.document;
-    if (doc?.file_id && typeof docMime === "string" && (docMime.startsWith("audio/") || docMime.startsWith("video/"))) {
+    if (doc?.file_id && typeof docMime === "string" && docMime.startsWith("audio/")) {
         return doc.file_id;
     }
 
     return null;
 }
 
-// 1. Group Chats: Handle mentions in replies to voice/audio/video messages
+// 1. Group Chats: Handle mentions in replies to voice/audio/video note messages
 bot.on("message:text", async (ctx) => {
     if (ctx.chat.type !== "group" && ctx.chat.type !== "supergroup") return;
 
@@ -127,10 +127,20 @@ bot.on("message:text", async (ctx) => {
     await handleTranscription(ctx, mediaFileId, ctx.message.reply_to_message?.message_id || ctx.message.message_id);
 });
 
-// 2. Private Chats: Auto-transcribe voice, audio, and video notes
-bot.on(["message:voice", "message:audio", "message:video_note", "message:video"], async (ctx) => {
+// 2. Group Chats: Auto-transcribe new voice/audio/video note messages without mentions
+bot.on(["message:voice", "message:audio", "message:video_note"], async (ctx) => {
+    if (ctx.chat.type === "group" || ctx.chat.type === "supergroup") {
+        const media = ctx.message.voice || ctx.message.audio || ctx.message.video_note;
+        if (media) {
+            await handleTranscription(ctx, media.file_id, ctx.message.message_id);
+        }
+    }
+});
+
+// 3. Private Chats: Auto-transcribe voice, audio, and video notes
+bot.on(["message:voice", "message:audio", "message:video_note"], async (ctx) => {
     if (ctx.chat.type === "private") {
-        const media = ctx.message.voice || ctx.message.audio || ctx.message.video_note || ctx.message.video;
+        const media = ctx.message.voice || ctx.message.audio || ctx.message.video_note;
         if (media) {
             await handleTranscription(ctx, media.file_id, ctx.message.message_id);
         }
