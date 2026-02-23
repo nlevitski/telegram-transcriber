@@ -8,6 +8,58 @@ if (!token) {
 }
 
 const bot = new Bot(token);
+const TELEGRAM_MESSAGE_LIMIT = 4096;
+
+function splitTextByLimit(text: string, limit: number): string[] {
+    if (text.length <= limit) return [text];
+
+    const chunks: string[] = [];
+    let remaining = text;
+
+    while (remaining.length > limit) {
+        const slice = remaining.slice(0, limit);
+        let splitAt = Math.max(slice.lastIndexOf("\n\n"), slice.lastIndexOf("\n"), slice.lastIndexOf(" "));
+
+        // If no good boundary is found, split hard at the limit.
+        if (splitAt < 1 || splitAt < Math.floor(limit * 0.5)) {
+            splitAt = limit;
+        }
+
+        const chunk = remaining.slice(0, splitAt).trimEnd();
+        chunks.push(chunk.length > 0 ? chunk : remaining.slice(0, limit));
+        remaining = remaining.slice(splitAt).trimStart();
+    }
+
+    if (remaining.length > 0) {
+        chunks.push(remaining);
+    }
+
+    return chunks;
+}
+
+function splitTranscriptionForTelegram(text: string): string[] {
+    if (text.length <= TELEGRAM_MESSAGE_LIMIT) {
+        return [text];
+    }
+
+    let expectedTotal = 2;
+
+    while (true) {
+        const prefix = `[${expectedTotal}/${expectedTotal}] `;
+        const perChunkLimit = TELEGRAM_MESSAGE_LIMIT - prefix.length;
+        const chunks = splitTextByLimit(text, perChunkLimit);
+
+        if (chunks.length <= 1) {
+            return [text];
+        }
+
+        if (chunks.length === expectedTotal) {
+            return chunks.map((chunk, index) => `[${index + 1}/${chunks.length}] ${chunk}`);
+        }
+
+        expectedTotal = chunks.length;
+    }
+}
 
 /**
  * Handles the transcription process: downloading, sending to ElevenLabs, and updating the status message.
@@ -39,11 +91,17 @@ async function handleTranscription(ctx: any, fileId: string, replyToMessageId: n
         const finalTranscription = await transcribeAudioStream(buffer, path.split('.').pop() || "ogg");
 
         if (finalTranscription && finalTranscription.trim().length > 0) {
+            const messageChunks = splitTranscriptionForTelegram(finalTranscription);
+
             await ctx.api.editMessageText(
                 ctx.chat.id,
                 sentMessage.message_id,
-                finalTranscription
+                messageChunks[0]
             );
+
+            for (let i = 1; i < messageChunks.length; i++) {
+                await ctx.reply(messageChunks[i], { reply_to_message_id: replyToMessageId });
+            }
         } else {
             await ctx.api.editMessageText(
                 ctx.chat.id,
