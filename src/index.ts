@@ -65,24 +65,79 @@ async function handleTranscription(ctx: any, fileId: string, replyToMessageId: n
     }
 }
 
-// 1. Group Chats: Handle mentions in replies to voice/audio/video messages
+function isBotMentioned(ctx: any): boolean {
+    const botUsername = ctx.me.username;
+    const text = ctx.message?.text ?? "";
+
+    if (text.includes(`@${botUsername}`)) {
+        return true;
+    }
+
+    const entities = ctx.message?.entities ?? [];
+    for (const entity of entities) {
+        if (entity.type !== "mention") continue;
+        const mention = text.slice(entity.offset, entity.offset + entity.length);
+        if (mention.toLowerCase() === `@${botUsername.toLowerCase()}`) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function getReplyMediaFileId(ctx: any): string | null {
+    const repliedMessage = ctx.message?.reply_to_message;
+    const externalReply = ctx.message?.external_reply;
+
+    const mediaFromReply = repliedMessage?.voice || repliedMessage?.audio || repliedMessage?.video_note;
+    if (mediaFromReply?.file_id) return mediaFromReply.file_id;
+
+    // Bot API may return replied content under external_reply in some contexts.
+    const mediaFromExternalReply = externalReply?.voice || externalReply?.audio || externalReply?.video_note;
+    if (mediaFromExternalReply?.file_id) return mediaFromExternalReply.file_id;
+
+    // Some clients send audio as generic documents.
+    const docMime = repliedMessage?.document?.mime_type || externalReply?.document?.mime_type;
+    const doc = repliedMessage?.document || externalReply?.document;
+    if (doc?.file_id && typeof docMime === "string" && docMime.startsWith("audio/")) {
+        return doc.file_id;
+    }
+
+    return null;
+}
+
+// 1. Group Chats: Handle mentions in replies to voice/audio/video note messages
 bot.on("message:text", async (ctx) => {
-    const isReply = !!ctx.message.reply_to_message;
+    if (ctx.chat.type !== "group" && ctx.chat.type !== "supergroup") return;
+
+    const isReply = !!ctx.message.reply_to_message || !!ctx.message.external_reply;
     if (!isReply) return;
 
-    const botUsername = ctx.me.username;
-    const isMentioned = ctx.message.text?.includes(`@${botUsername}`);
-    if (!isMentioned) return;
+    if (!isBotMentioned(ctx)) return;
 
-    const repliedMessage = ctx.message.reply_to_message;
-    const media = repliedMessage?.voice || repliedMessage?.audio || repliedMessage?.video_note;
+    const mediaFileId = getReplyMediaFileId(ctx);
+    if (!mediaFileId) {
+        await ctx.reply(
+            "⚠️ I can’t access media in that replied message. Ask the sender to resend voice/audio after I’m in the group, then reply-mention me again.",
+            { reply_to_message_id: ctx.message.message_id }
+        );
+        return;
+    }
 
-    if (media) {
-        await handleTranscription(ctx, media.file_id, repliedMessage.message_id);
+    await handleTranscription(ctx, mediaFileId, ctx.message.reply_to_message?.message_id || ctx.message.message_id);
+});
+
+// 2. Group Chats: Auto-transcribe new voice/audio/video note messages without mentions
+bot.on(["message:voice", "message:audio", "message:video_note"], async (ctx) => {
+    if (ctx.chat.type === "group" || ctx.chat.type === "supergroup") {
+        const media = ctx.message.voice || ctx.message.audio || ctx.message.video_note;
+        if (media) {
+            await handleTranscription(ctx, media.file_id, ctx.message.message_id);
+        }
     }
 });
 
-// 2. Private Chats: Auto-transcribe voice, audio, and video notes
+// 3. Private Chats: Auto-transcribe voice, audio, and video notes
 bot.on(["message:voice", "message:audio", "message:video_note"], async (ctx) => {
     if (ctx.chat.type === "private") {
         const media = ctx.message.voice || ctx.message.audio || ctx.message.video_note;
@@ -97,4 +152,3 @@ bot.start({
         console.log(`Bot @${botInfo.username} started! (Mode: ${Bun.env.NODE_ENV || 'production'})`);
     }
 });
-
