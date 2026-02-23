@@ -3,7 +3,9 @@ name: Remote Deploy
 on:
   push:
     branches:
-      - main  # деплой срабатывает при пуше в main
+      - main
+      - codex/dev
+  workflow_dispatch:
 
 jobs:
   deploy:
@@ -19,9 +21,9 @@ jobs:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          # Тут ваши команды, которые должны выполниться на сервере
+          port: ${{ secrets.SSH_PORT }}
           script: |
-            cd /var/www/telegram-transcriber
-            git fetch origin main
-            git reset --hard origin/main
+            cd ~/telegram-transcriber
+            git fetch origin ${{ github.ref_name }}
+            git reset --hard origin/${{ github.ref_name }}
             docker compose up -d --build
