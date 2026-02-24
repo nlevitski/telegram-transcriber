@@ -164,6 +164,18 @@ function getReplyMediaFileId(ctx: any): string | null {
     return null;
 }
 
+function getIncomingMediaFileId(ctx: any): string | null {
+    const media = ctx.message?.voice || ctx.message?.audio || ctx.message?.video_note;
+    if (media?.file_id) return media.file_id;
+
+    const doc = ctx.message?.document;
+    if (doc?.file_id && typeof doc.mime_type === "string" && doc.mime_type.startsWith("audio/")) {
+        return doc.file_id;
+    }
+
+    return null;
+}
+
 // 1. Group Chats: Handle mentions in replies to voice/audio/video note messages
 bot.on("message:text", async (ctx) => {
     if (ctx.chat.type !== "group" && ctx.chat.type !== "supergroup") return;
@@ -185,24 +197,19 @@ bot.on("message:text", async (ctx) => {
     await handleTranscription(ctx, mediaFileId, ctx.message.reply_to_message?.message_id || ctx.message.message_id);
 });
 
-// 2. Group Chats: Auto-transcribe new voice/audio/video note messages without mentions
-bot.on(["message:voice", "message:audio", "message:video_note"], async (ctx) => {
-    if (ctx.chat.type === "group" || ctx.chat.type === "supergroup") {
-        const media = ctx.message.voice || ctx.message.audio || ctx.message.video_note;
-        if (media) {
-            await handleTranscription(ctx, media.file_id, ctx.message.message_id);
-        }
-    }
-});
+// 2. Auto-transcribe incoming media messages in private and group chats.
+bot.on("message", async (ctx) => {
+    const inSupportedChat =
+        ctx.chat.type === "private" ||
+        ctx.chat.type === "group" ||
+        ctx.chat.type === "supergroup";
 
-// 3. Private Chats: Auto-transcribe voice, audio, and video notes
-bot.on(["message:voice", "message:audio", "message:video_note"], async (ctx) => {
-    if (ctx.chat.type === "private") {
-        const media = ctx.message.voice || ctx.message.audio || ctx.message.video_note;
-        if (media) {
-            await handleTranscription(ctx, media.file_id, ctx.message.message_id);
-        }
-    }
+    if (!inSupportedChat) return;
+
+    const mediaFileId = getIncomingMediaFileId(ctx);
+    if (!mediaFileId) return;
+
+    await handleTranscription(ctx, mediaFileId, ctx.message.message_id);
 });
 
 bot.start({
