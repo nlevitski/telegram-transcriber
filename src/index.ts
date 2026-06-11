@@ -212,7 +212,7 @@ bot.on("message", async (ctx) => {
     await handleTranscription(ctx, mediaFileId, ctx.message.message_id);
 });
 
-bot.start({
+await bot.start({
     onStart: (botInfo) => {
         console.log(`Bot @${botInfo.username} started! (Mode: ${Bun.env.NODE_ENV || 'production'})`);
     }
